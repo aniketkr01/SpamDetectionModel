@@ -1,0 +1,104 @@
+import string
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+
+#Reading Tab Seperated File
+messages = pd.read_csv("smsspamcollection/SMSSpamCollection",sep="\t",names=["type","message"])
+
+#Checking Head
+messages.head()
+
+#Adding Length Column
+messages["length"] = messages["message"].apply(lambda st: len(st))
+
+#Explore Data
+messages.hist(column="length",by="type",bins=80,figsize=(12,4))
+#It look like most of the words is in between 0-100 is ham
+#Words count in between 120-180 is spam
+
+def text_processing(msg):
+    """
+        parameter: string
+        return: processed string list
+    """
+    #remove all puctuationns
+    msg = [char for char in msg if char not in string.punctuation]
+    
+    #join all characters to form string
+    msg = "".join(msg)
+    
+    #remove all ths stop words and return processed texts
+    return [word for word in msg.split(" ") if word not in stopwords.words("english")]
+
+#lets create bag of words as sparse matrix
+transformer = CountVectorizer(analyzer=text_processing).fit(messages["message"])
+msg_bow = transformer.transform(messages["message"])
+
+#Lets Transform it using TfidfTransformer
+tf = TfidfTransformer().fit(msg_bow)
+msg_bow = tf.transform(msg_bow)
+
+#Lets split data
+x_train,x_test,y_train,y_test = train_test_split(msg_bow,messages["type"])
+
+#Lets create Neural Nets
+model = Sequential()
+
+#Adding Neurons 
+for  i in range(8):
+    model.add(Dense(units=8,activation="sigmoid"))
+
+#Adding last neuron
+model.add(Dense(units=1,activation="sigmoid"))
+
+#compiling model
+model.compile(loss="mse",optimizer="adam")
+
+#Converting sparse matrix to numpy arrays for further processing
+x_train=x_train.toarray()
+x_test=x_test.toarray()
+
+#converting type to dummy variable
+y_train = pd.get_dummies(y_train,drop_first=True)
+y_test = pd.get_dummies(y_test,drop_first=True)
+
+#train model
+model.fit(x_train,y_train,validation_data=(x_test,y_test),epochs=280,verbose=2)
+
+#lets look at the history
+model.history.history
+
+#lets evaluate model
+model.evaluate(x_test,y_test)
+
+#Lets predict
+pred = model.predict(x_test)
+
+def getResult(data):
+    """
+    parameter: data = predicted data
+    return: list of prediction as 0's or 1's
+    """
+    data = np.reshape(data,-1)
+    lst = []
+    for p in data:
+        if p < 0.5:
+            lst.append(0)
+        else:
+            lst.append(1)
+    return lst
+
+#Getting final Result
+pred=getResult(pred)
+
+#Saving Tensorflow model
+model.save("spam_detector.h5")
