@@ -10,9 +10,10 @@ import seaborn as sns
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.callbacks import EarlyStopping
 
 #Reading Tab Seperated File
-messages = pd.read_csv("smsspamcollection/SMSSpamCollection",sep="\t",names=["type","message"])
+messages = pd.read_csv("SMSSpamCollection",sep="\t",names=["type","message"])
 
 #Checking Head
 messages.head()
@@ -72,7 +73,10 @@ y_train = pd.get_dummies(y_train,drop_first=True)
 y_test = pd.get_dummies(y_test,drop_first=True)
 
 #train model
-model.fit(x_train,y_train,validation_data=(x_test,y_test),epochs=280,verbose=2)
+model.fit(x_train,y_train,
+          validation_data=(x_test,y_test),
+          epochs=280,verbose=2,
+          callbacks=EarlyStopping(monitor="val_loss",mode="min",patience=25))
 
 #lets look at the history
 model.history.history
